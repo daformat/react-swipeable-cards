@@ -76,7 +76,7 @@ Given the following jsx:
 // full source: https://github.com/daformat/hello-mat/blob/master/pages/design-engineering/component/swipeable-cards.tsx
 
 <SwipeableCards.Root
-  cards={[...cards /* omitted for brevity */ ]}
+  cards={[...cards /* omitted for brevity */]}
   className={styles.cards_root}
   data-style={"stacked-offset" /* "stacked-rotation" | "minimal" */}
   swipeStyle={"sendToBack"}
@@ -137,14 +137,16 @@ Here is how I styled it in the [demo](https://hello-mat.com/design-engineering/c
       [data-swipeable-cards-card-wrapper] {
         --p: calc(
           var(--card-top-distance, 0) *
-          max(var(--visible-stack-length) - var(--stack-index0), 0)
+            max(var(--visible-stack-length) - var(--stack-index0), 0)
         );
         --m: calc(
           var(--card-top-distance, 0) *
-          (
-          var(--visible-stack-length) -
-          max(var(--visible-stack-length) - var(--stack-index0), 0)
-          )
+            (
+              var(--visible-stack-length) - max(
+                  var(--visible-stack-length) - var(--stack-index0),
+                  0
+                )
+            )
         );
         margin-top: calc(var(--m) * -1);
         padding-top: calc(var(--p));
