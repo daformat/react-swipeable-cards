@@ -22,7 +22,7 @@
     "url": "git+https://github.com/daformat/react-swipeable-cards.git"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "ci": "pnpm build && pnpm format:check && pnpm test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -1,10 +1,9 @@
 import {
-  type ButtonHTMLAttributes,
+  type ComponentPropsWithoutRef,
   createContext,
   type CSSProperties,
   type ForwardedRef,
   forwardRef,
-  type HTMLAttributes,
   type JSX,
   type PropsWithChildren,
   type ReactNode,
@@ -67,17 +66,17 @@ export type CardWithId = {
 
 export type SwipeDirection = "left" | "right" | "up" | "down";
 
-export type swipeStyle = "discard" | "sendToBack";
+export type SwipeStyle = "discard" | "sendToBack";
 
 export type GetCardElement = (element: Element) => Element;
 
-export type BaseSwipeableCardsProps = HTMLAttributes<HTMLDivElement> & {
+export type BaseSwipeableCardsProps = ComponentPropsWithoutRef<"div"> & {
   // The initial cards to display in the stack
   cards: CardWithId[];
   // Callback that is run when the user swipes a card
   onSwipe?: (direction: SwipeDirection, cardId: string) => void;
   // The discard style when swiping,
-  swipeStyle?: swipeStyle;
+  swipeStyle?: SwipeStyle;
   // The optional margin to apply when swiping to the back, in pixels. Default is 0
   sendToBackMargin?: number;
   // Function that receives the Card element and returns the element to use for
@@ -121,7 +120,7 @@ const defaultDragState: DraggingState = {
 };
 
 const defaultGetCard: GetCardElement = (element) => {
-  return element;
+  return element.firstElementChild ?? element;
 };
 
 /**
@@ -379,7 +378,7 @@ const adjustHorizontalVelocityForExit = (
   nextCardsRect: DOMRect,
   innerRect: DOMRect,
   animationDuration: number,
-  swipeStyle: swipeStyle,
+  swipeStyle: SwipeStyle,
   sendToBackMargin: number,
   maxOnly = false,
 ) => {
@@ -423,7 +422,7 @@ const adjustVerticalVelocityForExit = (
   nextCardsRect: DOMRect,
   innerRect: DOMRect,
   animationDuration: number,
-  swipeStyle: swipeStyle,
+  swipeStyle: SwipeStyle,
   sendToBackMargin: number,
   maxOnly = false,
 ) => {
@@ -510,7 +509,7 @@ const adjustVelocityForExit = (
   state: DraggingState,
   rect: DOMRect,
   animationDuration: number,
-  swipeStyle: swipeStyle,
+  swipeStyle: SwipeStyle,
   cards: HTMLElement,
   getCard: GetCardElement,
   sendToBackMargin: number,
@@ -734,7 +733,7 @@ const animateSwipedElement = (
   element: HTMLElement,
   state: DraggingState,
   animationDuration: number,
-  swipeStyle: swipeStyle,
+  swipeStyle: SwipeStyle,
   getCard: GetCardElement,
   manual?: boolean,
 ) => {
@@ -904,7 +903,7 @@ const useSwipeableCards = (
   loop?: boolean,
   emptyView?: ReactNode,
   onSwipe?: (direction: SwipeDirection, cardId: string) => void,
-  swipeStyle: swipeStyle = "discard",
+  swipeStyle: SwipeStyle = "discard",
   getCardElement: GetCardElement = defaultGetCard,
   sendToBackMargin = 0,
 ) => {
@@ -1122,7 +1121,10 @@ SwipeableCardsRoot.displayName = "SwipeableCardsRoot";
 
 export type StackRenderer = (stack: CardWithId[]) => ReactNode;
 
-export type SwipeableCardsCardsProps = HTMLAttributes<HTMLDivElement> & {
+export type SwipeableCardsCardsProps = Omit<
+  ComponentPropsWithoutRef<"div">,
+  "children"
+> & {
   visibleStackLength?: number;
   cardsTopDistance?: string;
   children?: ReactNode | StackRenderer;
@@ -1186,7 +1188,7 @@ const SwipeableCardsCards = forwardRef<
 
 SwipeableCardsCards.displayName = "SwipeableCardsCards";
 
-export type SwipeableCardsCardWrapperProps = HTMLAttributes<HTMLDivElement> &
+export type SwipeableCardsCardWrapperProps = ComponentPropsWithoutRef<"div"> &
   PropsWithChildren<{
     card: CardWithId;
   }>;
@@ -1263,7 +1265,7 @@ SwipeableCardsCardWrapper.displayName = "SwipeableCardsCard";
 
 const SwipeableCardsSwipeLeftButton = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement>
+  ComponentPropsWithoutRef<"button">
 >(({ children, onClick, ...rest }, ref) => {
   const { trigger, swipeStyle } = useProgrammaticSwipe();
   return (
@@ -1298,7 +1300,7 @@ SwipeableCardsSwipeLeftButton.displayName = "SwipeableCardsSwipeLeftButton";
 
 const SwipeableCardsSwipeRightButton = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement>
+  ComponentPropsWithoutRef<"button">
 >(({ children, onClick, ...rest }, ref) => {
   const { trigger, swipeStyle } = useProgrammaticSwipe();
   return (
@@ -1331,7 +1333,7 @@ SwipeableCardsSwipeRightButton.displayName = "SwipeableCardsSwipeRightButton";
 
 const SwipeableCardsSwipeUpButton = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement>
+  ComponentPropsWithoutRef<"button">
 >(({ children, onClick, ...rest }, ref) => {
   const { trigger, swipeStyle } = useProgrammaticSwipe();
   return (
@@ -1368,7 +1370,7 @@ SwipeableCardsSwipeUpButton.displayName = "SwipeableCardsSwipeUpButton";
 
 const SwipeableCardsSwipeDownButton = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement>
+  ComponentPropsWithoutRef<"button">
 >(({ children, onClick, ...rest }, ref) => {
   const { trigger, swipeStyle } = useProgrammaticSwipe();
   return (
