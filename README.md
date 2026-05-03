@@ -68,6 +68,92 @@ how cards look, you decide how the stack is laid out (typically with CSS
 custom properties exposed by the component, see
 [CSS custom properties](#css-custom-properties)).
 
+## Styling examples
+
+Given the following jsx:
+
+```tsx
+// full source: https://github.com/daformat/hello-mat/blob/master/pages/design-engineering/component/swipeable-cards.tsx
+
+<SwipeableCards.Root
+  cards={[...cards /* omitted for brevity */ ]}
+  className={styles.cards_root}
+  data-style={"stacked-offset" /* "stacked-rotation" | "minimal" */}
+  swipeStyle={"sendToBack"}
+  sendToBackMargin={16}
+  loop
+>
+  <SwipeableCards.Cards
+    visibleStackLength={4}
+    style={{ aspectRatio: "650 / 400" }}
+  />
+</SwipeableCards.Root>
+```
+
+Here is how I styled it in the [demo](https://hello-mat.com/design-engineering/component/swipeable-cards)
+
+```scss
+/* full source: https://github.com/daformat/hello-mat/blob/master/components/SwipeableCards/SwipeableCards.module.scss */
+
+.cards_root {
+  --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+
+  [data-swipeable-cards-cards] {
+    display: grid;
+    grid-template-columns: 1fr;
+    place-content: center;
+    position: relative;
+    touch-action: none;
+    z-index: 1;
+
+    [data-swipeable-cards-card-wrapper] {
+      align-content: center;
+      align-self: center;
+      grid-area: 1 / 1;
+      opacity: calc(
+        1 - clamp(0, var(--stack-index0) - var(--visible-stack-length), 1)
+      );
+      touch-action: none;
+      transform-origin: center 0;
+      transition: all 0.2s var(--ease-out-cubic);
+      transition-property: opacity, scale, padding-top, margin-top;
+      width: 100%;
+      will-change: opacity, scale, padding-top, margin-top, transform;
+    }
+  }
+
+  &:is([data-style="stacked-offset"], [data-style="stacked-rotation"]) {
+    [data-swipeable-cards-cards] {
+      [data-swipeable-cards-card-wrapper] {
+        scale: calc(
+          100% - min(var(--stack-index0), var(--visible-stack-length)) * 10%
+        );
+      }
+    }
+  }
+
+  &[data-style="stacked-offset"] {
+    [data-swipeable-cards-cards] {
+      [data-swipeable-cards-card-wrapper] {
+        --p: calc(
+          var(--card-top-distance, 0) *
+          max(var(--visible-stack-length) - var(--stack-index0), 0)
+        );
+        --m: calc(
+          var(--card-top-distance, 0) *
+          (
+          var(--visible-stack-length) -
+          max(var(--visible-stack-length) - var(--stack-index0), 0)
+          )
+        );
+        margin-top: calc(var(--m) * -1);
+        padding-top: calc(var(--p));
+      }
+    }
+  }
+}
+```
+
 ## Component structure
 
 ```tsx
