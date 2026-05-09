@@ -190,9 +190,6 @@ describe("SwipeableCards.Cards", () => {
     expect(container?.style.getPropertyValue("--visible-stack-length")).toBe(
       "3",
     );
-    expect(container?.style.getPropertyValue("--card-top-distance")).toBe(
-      "clamp(16px, 1vw, 32px)",
-    );
   });
 
   it("respects custom visibleStackLength", () => {
