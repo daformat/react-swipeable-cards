@@ -1,5 +1,5 @@
 export {
-  SwipeableCards,
+  type AllowedSwipeDirection,
   type BaseSwipeableCardsProps,
   type CardWithId,
   type DraggingState,
@@ -7,6 +7,7 @@ export {
   type LoopingSwipeableProps,
   type NotLoopingSwipeableProps,
   type StackRenderer,
+  SwipeableCards,
   type SwipeableCardsCardsProps,
   type SwipeableCardsCardWrapperProps,
   type SwipeableCardsProps,

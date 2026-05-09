@@ -135,12 +135,14 @@ Here is how I styled it in the [demo](https://hello-mat.com/design-engineering/c
   &[data-style="stacked-offset"] {
     [data-swipeable-cards-cards] {
       [data-swipeable-cards-card-wrapper] {
+        // Pick whatever vertical step you want between stacked cards.
+        --card-top-distance: clamp(16px, 1vw, 32px);
         --p: calc(
-          var(--card-top-distance, 0) *
+          var(--card-top-distance) *
             max(var(--visible-stack-length) - var(--stack-index0), 0)
         );
         --m: calc(
-          var(--card-top-distance, 0) *
+          var(--card-top-distance) *
             (
               var(--visible-stack-length) - max(
                   var(--visible-stack-length) - var(--stack-index0),
@@ -189,17 +191,18 @@ The `loop` prop is part of a discriminated union: when `loop` is `false` (or
 omitted) you **must** pass `emptyView`; when `loop` is `true` you **must not**
 pass `emptyView`.
 
-| Prop               | Type                                                  | Default     | Description                                                                                                                                                                                                                                                                                                                              |
-| ------------------ | ----------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cards` (required) | `CardWithId[]`                                        | —           | Initial cards in the stack. The last item is the top card.                                                                                                                                                                                                                                                                               |
-| `emptyView`        | `ReactNode`                                           | —           | Required when `loop` is `false`. Displayed when the stack is empty.                                                                                                                                                                                                                                                                      |
-| `loop`             | `boolean`                                             | `false`     | When `true`, swiped cards animate to the back of the stack instead of being removed. `emptyView` cannot be set in this mode.                                                                                                                                                                                                             |
-| `onSwipe`          | `(direction: SwipeDirection, cardId: string) => void` | —           | Called once per swipe, immediately after the card commits to flying out (before the animation finishes).                                                                                                                                                                                                                                 |
-| `swipeStyle`       | `"discard" \| "sendToBack"`                           | `"discard"` | `"discard"` flings the card off-screen and fades it out. `"sendToBack"` slides it just past the stack edge before animating it under the other cards.                                                                                                                                                                                    |
-| `sendToBackMargin` | `number`                                              | `0`         | Extra pixels the card travels past the stack edge before being sent to the back. Only used when `swipeStyle` is `"sendToBack"`.                                                                                                                                                                                                          |
-| `getCardElement`   | `(element: Element) => Element`                       | first child | Receives the wrapper element and returns the actual card element to use for collision detection. Defaults to `element.firstElementChild ?? element`, so by default any padding on the wrapper is excluded. Override when the visible card isn't the wrapper's first child (e.g. when you nest extra layout elements inside the wrapper). |
-| `ref`              | `Ref<HTMLDivElement>`                                 | —           | Forwarded ref to the root `<div>`.                                                                                                                                                                                                                                                                                                       |
-| `...props`         | `ComponentPropsWithoutRef<"div">`                     | —           | All standard `<div>` props (`className`, `style`, `children`, etc.).                                                                                                                                                                                                                                                                     |
+| Prop               | Type                                                  | Default     | Description                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------ | ----------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cards` (required) | `CardWithId[]`                                        | —           | Initial cards in the stack. The last item is the top card.                                                                                                                                                                                                                                                                                                                                    |
+| `emptyView`        | `ReactNode`                                           | —           | Required when `loop` is `false`. Displayed when the stack is empty.                                                                                                                                                                                                                                                                                                                           |
+| `loop`             | `boolean`                                             | `false`     | When `true`, swiped cards animate to the back of the stack instead of being removed. `emptyView` cannot be set in this mode.                                                                                                                                                                                                                                                                  |
+| `onSwipe`          | `(direction: SwipeDirection, cardId: string) => void` | —           | Called once per swipe, immediately after the card commits to flying out (before the animation finishes).                                                                                                                                                                                                                                                                                      |
+| `swipeStyle`       | `"discard" \| "sendToBack"`                           | `"discard"` | `"discard"` flings the card off-screen and fades it out. `"sendToBack"` slides it just past the stack edge before animating it under the other cards.                                                                                                                                                                                                                                         |
+| `sendToBackMargin` | `number`                                              | `0`         | Extra pixels the card travels past the stack edge before being sent to the back. Only used when `swipeStyle` is `"sendToBack"`.                                                                                                                                                                                                                                                               |
+| `getCardElement`   | `(element: Element) => Element`                       | first child | Receives the wrapper element and returns the actual card element to use for collision detection. Defaults to `element.firstElementChild ?? element`, so by default any padding on the wrapper is excluded. Override when the visible card isn't the wrapper's first child (e.g. when you nest extra layout elements inside the wrapper).                                                      |
+| `swipeDirections`  | `AllowedSwipeDirection \| AllowedSwipeDirection[]`    | all 4       | Restricts which directions the card can be swiped. Accepts a single value or array of `SwipeDirection \| "x" \| "y" \| "horizontal" \| "vertical"`. The shortcuts expand to the corresponding pair (`"x"`/`"horizontal"` → `["left", "right"]`, `"y"`/`"vertical"` → `["up", "down"]`). Constrains pointer drag to the allowed axes/directions and disables the matching directional buttons. |
+| `ref`              | `Ref<HTMLDivElement>`                                 | —           | Forwarded ref to the root `<div>`.                                                                                                                                                                                                                                                                                                                                                            |
+| `...props`         | `ComponentPropsWithoutRef<"div">`                     | —           | All standard `<div>` props (`className`, `style`, `children`, etc.).                                                                                                                                                                                                                                                                                                                          |
 
 #### Data attributes set on the root
 
@@ -220,7 +223,6 @@ freely).
 | Prop                 | Type                                                | Default                      | Description                                                                                                                                               |
 | -------------------- | --------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `visibleStackLength` | `number`                                            | `4`                          | How many cards from the top of the stack should appear in the visible peek. Used to compute `--visible-stack-length` for your styles.                     |
-| `cardsTopDistance`   | `string`                                            | `"clamp(16px, 1vw, 32px)"`   | Vertical distance between cards in the visible peek. Exposed as `--card-top-distance` so you can use it in `top`, `padding-top`, etc.                     |
 | `children`           | `ReactNode \| (stack: CardWithId[]) => ReactNode`   | renders one wrapper per card | Either pre-rendered children or a function that receives the current stack and returns nodes. Use the function form when you need per-card customization. |
 | `ref`                | `Ref<HTMLDivElement>`                               | —                            | Forwarded ref to the cards `<div>`.                                                                                                                       |
 | `...props`           | `Omit<ComponentPropsWithoutRef<"div">, "children">` | —                            | All standard `<div>` props except `children` (overridden by the function-as-children variant).                                                            |
@@ -294,6 +296,8 @@ const {
   getCardElement,
   sendToBackMargin,
   rootRef,
+  swipeDirections,
+  swipeDirectionsRef,
 } = SwipeableCards.useSwipeableCardsContext();
 ```
 
@@ -313,6 +317,8 @@ const {
 | `getCardElement`     | `(element: Element) => Element`                    | Reflects the `getCardElement` prop.                                                                                                  |
 | `sendToBackMargin`   | `number`                                           | Reflects the `sendToBackMargin` prop.                                                                                                |
 | `rootRef`            | `RefObject<HTMLDivElement>`                        | Ref to the root `<div>` rendered by `SwipeableCards.Root`.                                                                           |
+| `swipeDirections`    | `SwipeDirection[]`                                 | The normalized list of allowed swipe directions (defaults to all 4). Re-renders consumers when the `swipeDirections` prop changes.   |
+| `swipeDirectionsRef` | `RefObject<SwipeDirection[]>`                      | Ref mirror of the above for read-anywhere access in event handlers without re-binding listeners.                                     |
 
 ---
 
@@ -335,13 +341,15 @@ triggers. Throws if the surrounding tree does not include a
 `SwipeableCards.Cards` container when the trigger fires.
 
 ```tsx
-const { trigger, swipeStyle } = SwipeableCards.useProgrammaticSwipe();
+const { trigger, swipeStyle, swipeDirections } =
+  SwipeableCards.useProgrammaticSwipe();
 ```
 
-| Property     | Type                                                                 | Description                                                                                                                                                                         |
-| ------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `trigger`    | `(configure: (state: DraggingState, rect: DOMRect) => void) => void` | Triggers a swipe of the top card. Your `configure` callback receives the (zeroed) drag state and the wrapper's bounding rect; set `velocityX/Y`, `pivotX/Y`, `startX/Y`, `lastX/Y`. |
-| `swipeStyle` | `"discard" \| "sendToBack"`                                          | Mirrors the active `swipeStyle` so your custom button can pick velocity values that look right for either mode.                                                                     |
+| Property          | Type                                                                 | Description                                                                                                                                                                         |
+| ----------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trigger`         | `(configure: (state: DraggingState, rect: DOMRect) => void) => void` | Triggers a swipe of the top card. Your `configure` callback receives the (zeroed) drag state and the wrapper's bounding rect; set `velocityX/Y`, `pivotX/Y`, `startX/Y`, `lastX/Y`. |
+| `swipeStyle`      | `"discard" \| "sendToBack"`                                          | Mirrors the active `swipeStyle` so your custom button can pick velocity values that look right for either mode.                                                                     |
+| `swipeDirections` | `SwipeDirection[]`                                                   | The normalized list of allowed directions, useful for disabling your own custom triggers when their direction is not allowed.                                                       |
 
 #### Example: a "super-like" upward swipe
 
@@ -382,7 +390,6 @@ into every card.
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | `--stack-length`         | Number of cards currently in the stack.                                                                           |
 | `--visible-stack-length` | Number of cards in the "peek" (top of the stack visible behind the topmost card), capped to `visibleStackLength`. |
-| `--card-top-distance`    | The `cardsTopDistance` value, ready to be used in `top`, `padding-top`, etc.                                      |
 
 #### On each `SwipeableCards.CardWrapper`
 
@@ -402,7 +409,7 @@ into every card.
     scale 0.3s,
     translate 0.3s;
   scale: calc(1 - var(--stack-index0) * 0.05);
-  translate: 0 calc(var(--stack-index0) * var(--card-top-distance));
+  translate: 0 calc(var(--stack-index0) * clamp(16px, 1vw, 32px));
   z-index: var(--stack-length);
   pointer-events: none;
 }
@@ -425,6 +432,7 @@ into every card.
 import type {
   CardWithId,
   SwipeDirection,
+  AllowedSwipeDirection,
   SwipeStyle,
   GetCardElement,
   StackRenderer,
@@ -438,12 +446,13 @@ import type {
 } from "@daformat/react-swipeable-cards";
 ```
 
-| Type                  | Shape                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `CardWithId`          | `{ id: string; card: JSX.Element }`                                                                                 |
-| `SwipeDirection`      | `"left" \| "right" \| "up" \| "down"`                                                                               |
-| `SwipeStyle`          | `"discard" \| "sendToBack"`                                                                                         |
-| `GetCardElement`      | `(element: Element) => Element`                                                                                     |
-| `StackRenderer`       | `(stack: CardWithId[]) => ReactNode`                                                                                |
-| `DraggingState`       | Mutable drag state object (pointer position, velocity, pivot, currently-dragged element). See `dragStateRef` above. |
-| `SwipeableCardsProps` | Discriminated union of `NotLoopingSwipeableProps` and `LoopingSwipeableProps`.                                      |
+| Type                    | Shape                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `CardWithId`            | `{ id: string; card: JSX.Element }`                                                                                 |
+| `SwipeDirection`        | `"left" \| "right" \| "up" \| "down"`                                                                               |
+| `AllowedSwipeDirection` | `SwipeDirection \| "x" \| "y" \| "horizontal" \| "vertical"` — accepted by the `swipeDirections` prop.              |
+| `SwipeStyle`            | `"discard" \| "sendToBack"`                                                                                         |
+| `GetCardElement`        | `(element: Element) => Element`                                                                                     |
+| `StackRenderer`         | `(stack: CardWithId[]) => ReactNode`                                                                                |
+| `DraggingState`         | Mutable drag state object (pointer position, velocity, pivot, currently-dragged element). See `dragStateRef` above. |
+| `SwipeableCardsProps`   | Discriminated union of `NotLoopingSwipeableProps` and `LoopingSwipeableProps`.                                      |

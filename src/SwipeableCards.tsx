@@ -29,6 +29,9 @@ const minDistanceThreshold = 0.3;
 const minVelocity = 0.15;
 // Reference length (px) used to normalise pivot offset in the rotation formula
 const rotationBasis = 250;
+// Maximum (rubber-banded) drag distance allowed when dragging in a direction
+// that is not in the configured `swipeDirections` list
+const disallowedDirectionMaxDistance = 32;
 // Whether to enable debug mode (draws debug rectangles)
 const DEBUG = false;
 
@@ -66,6 +69,15 @@ export type CardWithId = {
 
 export type SwipeDirection = "left" | "right" | "up" | "down";
 
+// Values accepted by the `swipeDirections` prop. Single directions or axis
+// shortcuts ("x"/"horizontal" => left+right, "y"/"vertical" => up+down).
+export type AllowedSwipeDirection =
+  | SwipeDirection
+  | "x"
+  | "y"
+  | "horizontal"
+  | "vertical";
+
 export type SwipeStyle = "discard" | "sendToBack";
 
 export type GetCardElement = (element: Element) => Element;
@@ -84,6 +96,11 @@ export type BaseSwipeableCardsProps = ComponentPropsWithoutRef<"div"> & {
   // by default we will include the padding in the collision detection.
   // Returning a different element allows you to override this behavior.
   getCardElement?: GetCardElement;
+  // The directions in which the user is allowed to swipe. Accepts a single
+  // direction or an array; "x"/"horizontal" expands to ["left", "right"] and
+  // "y"/"vertical" expands to ["up", "down"]. Constrains both pointer drag
+  // and the directional buttons' disabled state. Defaults to all 4 directions.
+  swipeDirections?: AllowedSwipeDirection | AllowedSwipeDirection[];
 };
 
 export type NotLoopingSwipeableProps = BaseSwipeableCardsProps & {
@@ -121,6 +138,42 @@ const defaultDragState: DraggingState = {
 
 const defaultGetCard: GetCardElement = (element) => {
   return element.firstElementChild ?? element;
+};
+
+const defaultSwipeDirections: SwipeDirection[] = [
+  "left",
+  "right",
+  "up",
+  "down",
+];
+
+/**
+ * Normalize the `swipeDirections` prop value into a deduplicated
+ * `SwipeDirection[]`, expanding axis shortcuts ("x"/"horizontal",
+ * "y"/"vertical") to their corresponding pair of directions.
+ */
+const normalizeSwipeDirections = (
+  input: AllowedSwipeDirection | AllowedSwipeDirection[],
+): SwipeDirection[] => {
+  const list = Array.isArray(input) ? input : [input];
+  const result: SwipeDirection[] = [];
+  const add = (direction: SwipeDirection) => {
+    if (!result.includes(direction)) {
+      result.push(direction);
+    }
+  };
+  for (const item of list) {
+    if (item === "x" || item === "horizontal") {
+      add("left");
+      add("right");
+    } else if (item === "y" || item === "vertical") {
+      add("up");
+      add("down");
+    } else {
+      add(item);
+    }
+  }
+  return result;
 };
 
 /**
@@ -372,6 +425,11 @@ const getStackFutureBoundingBox = (
  * enough (or close enough), so that
  * - the element does not clip with the stack when `swipeStyle` is `sendToBack`
  * - the element animates out of the viewport when `swipeStyle` is `discard`
+ *
+ * `direction` controls which screen edge the card should exit from. Pass the
+ * already-resolved `swipeDirection` for the primary (boosting) axis so the
+ * exit animation matches the reported swipe even when the user dragged
+ * primarily along a different axis.
  */
 const adjustHorizontalVelocityForExit = (
   state: DraggingState,
@@ -380,9 +438,10 @@ const adjustHorizontalVelocityForExit = (
   animationDuration: number,
   swipeStyle: SwipeStyle,
   sendToBackMargin: number,
+  direction: "left" | "right",
   maxOnly = false,
 ) => {
-  const isLeft = state.startX > state.lastX;
+  const isLeft = direction === "left";
   const cardStackKey: keyof DOMRect = isLeft ? "left" : "right";
   const innerKey: keyof DOMRect = isLeft ? "right" : "left";
   const minDistance =
@@ -416,6 +475,11 @@ const adjustHorizontalVelocityForExit = (
  * enough (or close enough), so that
  * - the element does not clip with the stack when `swipeStyle` is `sendToBack`
  * - the element animates out of the viewport when `swipeStyle` is `discard`
+ *
+ * `direction` controls which screen edge the card should exit from. Pass the
+ * already-resolved `swipeDirection` for the primary (boosting) axis so the
+ * exit animation matches the reported swipe even when the user dragged
+ * primarily along a different axis.
  */
 const adjustVerticalVelocityForExit = (
   state: DraggingState,
@@ -424,9 +488,10 @@ const adjustVerticalVelocityForExit = (
   animationDuration: number,
   swipeStyle: SwipeStyle,
   sendToBackMargin: number,
+  direction: "up" | "down",
   maxOnly = false,
 ) => {
-  const isTop = state.startY > state.lastY;
+  const isTop = direction === "up";
   const cardStackKey: keyof DOMRect = isTop ? "top" : "bottom";
   const innerKey: keyof DOMRect = isTop ? "bottom" : "top";
   const minDistance =
@@ -513,6 +578,7 @@ const adjustVelocityForExit = (
   cards: HTMLElement,
   getCard: GetCardElement,
   sendToBackMargin: number,
+  swipeDirection: SwipeDirection,
   pass = 0,
 ) => {
   if (!state.element) {
@@ -530,9 +596,13 @@ const adjustVelocityForExit = (
     drawRect(nextCardsRect, "original-rect");
   }
 
-  const isHorizontal =
-    Math.abs(state.startX - state.lastX) >=
-    Math.abs(state.startY - state.lastY);
+  // Pick the primary axis from the resolved swipe direction so the exit
+  // matches what `commitSwipe` reports, even if displacement is dominated by
+  // the perpendicular axis (e.g. when that axis is rubber-banded by
+  // `swipeDirections`). For the secondary axis (sendToBack only, maxOnly) we
+  // still need a sign — derive it from the live velocity so we cap whichever
+  // way the card is currently drifting.
+  const isHorizontal = swipeDirection === "left" || swipeDirection === "right";
 
   if (isHorizontal) {
     adjustHorizontalVelocityForExit(
@@ -542,6 +612,7 @@ const adjustVelocityForExit = (
       animationDuration,
       swipeStyle,
       sendToBackMargin,
+      swipeDirection,
     );
     if (swipeStyle === "sendToBack") {
       adjustVerticalVelocityForExit(
@@ -551,6 +622,7 @@ const adjustVelocityForExit = (
         animationDuration,
         swipeStyle,
         sendToBackMargin,
+        state.velocityY < 0 ? "up" : "down",
         true,
       );
     }
@@ -562,6 +634,7 @@ const adjustVelocityForExit = (
       animationDuration,
       swipeStyle,
       sendToBackMargin,
+      swipeDirection,
     );
     if (swipeStyle === "sendToBack") {
       adjustHorizontalVelocityForExit(
@@ -571,6 +644,7 @@ const adjustVelocityForExit = (
         animationDuration,
         swipeStyle,
         sendToBackMargin,
+        state.velocityX < 0 ? "left" : "right",
         true,
       );
     }
@@ -586,6 +660,7 @@ const adjustVelocityForExit = (
       cards,
       getCard,
       sendToBackMargin,
+      swipeDirection,
       pass + 1,
     );
   }
@@ -696,6 +771,48 @@ const getRotation = (
       rotationFactor) /
       100;
   return Math.sign(rotation) * Math.min(Math.abs(rotation), maxRotation);
+};
+
+/**
+ * iOS-style rubber-band easing curve. Maps an unbounded `translation` onto an
+ * asymptote of `dimension`, so the user gets diminishing returns past the
+ * limit. `ratio` reduces the eased value (0 = full effect, 1 = none).
+ */
+const iOSRubberBand = (translation: number, ratio: number, dimension = 1) => {
+  const constant = 0.55;
+  const easedValue =
+    (1 - 1 / ((translation * constant) / dimension + 1)) * dimension;
+  return easedValue * (1 - ratio);
+};
+
+/**
+ * Returns the rubber-banded `clientX/clientY` for a pointer position when
+ * the user is dragging in a direction that is not allowed by
+ * `swipeDirections`. The drag asymptotically approaches
+ * `disallowedDirectionMaxDistance` instead of hard-clamping to the start.
+ */
+const applyDisallowedDirectionRubberBand = (
+  clientX: number,
+  clientY: number,
+  startX: number,
+  startY: number,
+  allowed: SwipeDirection[],
+): { clientX: number; clientY: number } => {
+  const dx = clientX - startX;
+  const dy = clientY - startY;
+  let easedDx = dx;
+  let easedDy = dy;
+  if (dx < 0 && !allowed.includes("left")) {
+    easedDx = -iOSRubberBand(-dx, 0, disallowedDirectionMaxDistance);
+  } else if (dx > 0 && !allowed.includes("right")) {
+    easedDx = iOSRubberBand(dx, 0, disallowedDirectionMaxDistance);
+  }
+  if (dy < 0 && !allowed.includes("up")) {
+    easedDy = -iOSRubberBand(-dy, 0, disallowedDirectionMaxDistance);
+  } else if (dy > 0 && !allowed.includes("down")) {
+    easedDy = iOSRubberBand(dy, 0, disallowedDirectionMaxDistance);
+  }
+  return { clientX: startX + easedDx, clientY: startY + easedDy };
 };
 
 /**
@@ -816,14 +933,18 @@ const animateSwipedElement = (
 };
 
 /**
- * Compute the velocity of the swipe gesture for the given pointer event
+ * Compute the velocity of the swipe gesture for the given pointer coordinates
  */
-const computeVelocity = (state: DraggingState, event: PointerEvent) => {
+const computeVelocity = (
+  state: DraggingState,
+  clientX: number,
+  clientY: number,
+) => {
   const maxAbsoluteVelocity = 1000;
   const currentTime = Date.now();
   const deltaTime = currentTime - state.lastTime;
-  const deltaX = event.clientX - state.lastX;
-  const deltaY = event.clientY - state.lastY;
+  const deltaX = clientX - state.lastX;
+  const deltaY = clientY - state.lastY;
   if (deltaTime > 0) {
     state.velocityX = deltaX / deltaTime; // (pixels per millisecond)
     if (Math.abs(state.velocityX) > maxAbsoluteVelocity) {
@@ -834,8 +955,8 @@ const computeVelocity = (state: DraggingState, event: PointerEvent) => {
       state.velocityY = Math.sign(state.velocityY) * maxAbsoluteVelocity;
     }
   }
-  state.lastX = event.clientX;
-  state.lastY = event.clientY;
+  state.lastX = clientX;
+  state.lastY = clientY;
   state.lastTime = currentTime;
 };
 
@@ -869,6 +990,7 @@ const useProgrammaticSwipe = () => {
     commitSwipe,
     swipeStyle,
     rootRef,
+    swipeDirections,
   } = useContext(SwipeableCardsContext);
 
   const trigger = useCallback(
@@ -895,7 +1017,7 @@ const useProgrammaticSwipe = () => {
     [commitSwipe, discardedCardId, dragStateRef, rootRef, stack],
   );
 
-  return { trigger, swipeStyle };
+  return { trigger, swipeStyle, swipeDirections };
 };
 
 const useSwipeableCards = (
@@ -906,12 +1028,27 @@ const useSwipeableCards = (
   swipeStyle: SwipeStyle = "discard",
   getCardElement: GetCardElement = defaultGetCard,
   sendToBackMargin = 0,
+  swipeDirectionsInput?: AllowedSwipeDirection | AllowedSwipeDirection[],
 ) => {
   const [stack, setStack] = useState(cards);
   const [discardedCardId, setDiscardedCardId] = useState<string>("");
   const dragStateRef = useRef<DraggingState>({ ...defaultDragState });
   const animationRef = useRef<Animation[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Normalized list exposed via context so consumers (buttons, custom triggers)
+  // can read the active directions and react to changes.
+  const swipeDirections = useMemo(
+    () =>
+      swipeDirectionsInput
+        ? normalizeSwipeDirections(swipeDirectionsInput)
+        : defaultSwipeDirections,
+    [swipeDirectionsInput],
+  );
+  // Mirror in a ref so the pointer-move listener and `commitSwipe` can read
+  // the latest value without forcing re-registration / re-creation.
+  const swipeDirectionsRef = useRef(swipeDirections);
+  // eslint-disable-next-line react-hooks/refs
+  swipeDirectionsRef.current = swipeDirections;
 
   /**
    * Update the stack when the animations are finished and reset styles
@@ -953,8 +1090,12 @@ const useSwipeableCards = (
         return;
       }
       const rect = getCardElement(element).getBoundingClientRect();
-      // const rect = getVisualBoundingBox(element, [element]);
       if (shouldReturnToStack(state, rect)) {
+        animateReturnToStack(state, element);
+        return;
+      }
+      const swipeDirection = getSwipeDirection(state);
+      if (!swipeDirectionsRef.current.includes(swipeDirection)) {
         animateReturnToStack(state, element);
         return;
       }
@@ -974,6 +1115,7 @@ const useSwipeableCards = (
         cards,
         getCardElement,
         sendToBackMargin,
+        swipeDirection,
         0,
       );
       const discardedCardId = element.dataset.swipeableCardsId ?? "";
@@ -991,7 +1133,6 @@ const useSwipeableCards = (
       state.dragging = false;
       state.draggingId = "";
       state.element = null;
-      const swipeDirection = getSwipeDirection(state);
       onSwipe?.(swipeDirection, discardedCardId);
     },
     [
@@ -1018,6 +1159,8 @@ const useSwipeableCards = (
     getCardElement,
     sendToBackMargin,
     rootRef,
+    swipeDirections,
+    swipeDirectionsRef,
   };
 };
 
@@ -1038,6 +1181,8 @@ const SwipeableCardsContext = createContext<
   rootRef: { current: null },
   getCardElement: defaultGetCard,
   sendToBackMargin: 0,
+  swipeDirections: defaultSwipeDirections,
+  swipeDirectionsRef: { current: defaultSwipeDirections },
 });
 
 export const SwipeableCardsRoot = forwardRef<
@@ -1054,6 +1199,7 @@ export const SwipeableCardsRoot = forwardRef<
       children,
       getCardElement,
       sendToBackMargin,
+      swipeDirections,
       ...rest
     },
     ref,
@@ -1066,8 +1212,9 @@ export const SwipeableCardsRoot = forwardRef<
       swipeStyle,
       getCardElement,
       sendToBackMargin,
+      swipeDirections,
     );
-    const { dragStateRef, commitSwipe } = context;
+    const { dragStateRef, commitSwipe, swipeDirectionsRef } = context;
 
     useEffect(() => {
       const handlePointerMove = (event: PointerEvent) => {
@@ -1076,7 +1223,17 @@ export const SwipeableCardsRoot = forwardRef<
           return;
         }
         event.preventDefault();
-        computeVelocity(state, event);
+        // Rubber-band the pointer position on any axis whose direction is not
+        // in `swipeDirections`, so the card eases up to a small offset
+        // (`disallowedDirectionMaxDistance`) instead of moving freely.
+        const { clientX, clientY } = applyDisallowedDirectionRubberBand(
+          event.clientX,
+          event.clientY,
+          state.startX,
+          state.startY,
+          swipeDirectionsRef.current,
+        );
+        computeVelocity(state, clientX, clientY);
         const translateX = state.lastX - state.startX;
         const translateY = state.lastY - state.startY;
         const rotation = getRotation(
@@ -1101,7 +1258,7 @@ export const SwipeableCardsRoot = forwardRef<
         document.removeEventListener("pointermove", handlePointerMove);
         document.removeEventListener("pointerup", handlePointerUp);
       };
-    }, [commitSwipe, dragStateRef]);
+    }, [commitSwipe, dragStateRef, swipeDirectionsRef]);
 
     return (
       <SwipeableCardsContext.Provider value={context}>
@@ -1126,7 +1283,6 @@ export type SwipeableCardsCardsProps = Omit<
   "children"
 > & {
   visibleStackLength?: number;
-  cardsTopDistance?: string;
   children?: ReactNode | StackRenderer;
 };
 
@@ -1141,13 +1297,7 @@ const SwipeableCardsCards = forwardRef<
   SwipeableCardsCardsProps
 >(
   (
-    {
-      visibleStackLength = 4,
-      cardsTopDistance = "clamp(16px, 1vw, 32px)",
-      style,
-      children = defaultStackRenderer,
-      ...rest
-    },
+    { visibleStackLength = 4, style, children = defaultStackRenderer, ...rest },
     ref,
   ) => {
     const { stack, emptyView, discardedCardId, loop } = useContext(
@@ -1175,7 +1325,6 @@ const SwipeableCardsCards = forwardRef<
               stack.length - (shouldOffset ? 1 : 0),
               0,
             ),
-            "--card-top-distance": cardsTopDistance,
           } as CSSProperties
         }
       >
@@ -1266,12 +1415,14 @@ SwipeableCardsCardWrapper.displayName = "SwipeableCardsCard";
 const SwipeableCardsSwipeLeftButton = forwardRef<
   HTMLButtonElement,
   ComponentPropsWithoutRef<"button">
->(({ children, onClick, ...rest }, ref) => {
-  const { trigger, swipeStyle } = useProgrammaticSwipe();
+>(({ children, onClick, disabled, ...rest }, ref) => {
+  const { trigger, swipeStyle, swipeDirections } = useProgrammaticSwipe();
+  const isAllowed = swipeDirections.includes("left");
   return (
     <button
       ref={ref}
       {...rest}
+      disabled={disabled || !isAllowed}
       onClick={(event) => {
         onClick?.(event);
         trigger((state, rect) => {
@@ -1301,12 +1452,14 @@ SwipeableCardsSwipeLeftButton.displayName = "SwipeableCardsSwipeLeftButton";
 const SwipeableCardsSwipeRightButton = forwardRef<
   HTMLButtonElement,
   ComponentPropsWithoutRef<"button">
->(({ children, onClick, ...rest }, ref) => {
-  const { trigger, swipeStyle } = useProgrammaticSwipe();
+>(({ children, onClick, disabled, ...rest }, ref) => {
+  const { trigger, swipeStyle, swipeDirections } = useProgrammaticSwipe();
+  const isAllowed = swipeDirections.includes("right");
   return (
     <button
       ref={ref}
       {...rest}
+      disabled={disabled || !isAllowed}
       onClick={(event) => {
         onClick?.(event);
         trigger((state, rect) => {
@@ -1334,12 +1487,14 @@ SwipeableCardsSwipeRightButton.displayName = "SwipeableCardsSwipeRightButton";
 const SwipeableCardsSwipeUpButton = forwardRef<
   HTMLButtonElement,
   ComponentPropsWithoutRef<"button">
->(({ children, onClick, ...rest }, ref) => {
-  const { trigger, swipeStyle } = useProgrammaticSwipe();
+>(({ children, onClick, disabled, ...rest }, ref) => {
+  const { trigger, swipeStyle, swipeDirections } = useProgrammaticSwipe();
+  const isAllowed = swipeDirections.includes("up");
   return (
     <button
       ref={ref}
       {...rest}
+      disabled={disabled || !isAllowed}
       onClick={(event) => {
         onClick?.(event);
         trigger((state, rect) => {
@@ -1371,12 +1526,14 @@ SwipeableCardsSwipeUpButton.displayName = "SwipeableCardsSwipeUpButton";
 const SwipeableCardsSwipeDownButton = forwardRef<
   HTMLButtonElement,
   ComponentPropsWithoutRef<"button">
->(({ children, onClick, ...rest }, ref) => {
-  const { trigger, swipeStyle } = useProgrammaticSwipe();
+>(({ children, onClick, disabled, ...rest }, ref) => {
+  const { trigger, swipeStyle, swipeDirections } = useProgrammaticSwipe();
+  const isAllowed = swipeDirections.includes("down");
   return (
     <button
       ref={ref}
       {...rest}
+      disabled={disabled || !isAllowed}
       onClick={(event) => {
         onClick?.(event);
         trigger((state, rect) => {
