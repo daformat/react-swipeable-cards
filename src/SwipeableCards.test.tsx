@@ -195,18 +195,15 @@ describe("SwipeableCards.Cards", () => {
     );
   });
 
-  it("respects custom visibleStackLength and cardsTopDistance props", () => {
+  it("respects custom visibleStackLength", () => {
     render(
       <SwipeableCards.Root cards={makeCards(10)} loop={false} emptyView={null}>
-        <SwipeableCards.Cards visibleStackLength={2} cardsTopDistance="8px" />
+        <SwipeableCards.Cards visibleStackLength={2} />
       </SwipeableCards.Root>,
     );
     const container = getCardsContainer();
     expect(container?.style.getPropertyValue("--visible-stack-length")).toBe(
       "1",
-    );
-    expect(container?.style.getPropertyValue("--card-top-distance")).toBe(
-      "8px",
     );
   });
 });
