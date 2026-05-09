@@ -1,6 +1,6 @@
 {
   "name": "@daformat/react-swipeable-cards",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "Zero-Clause BSD",
   "description": "A headless react swipeable cards carousel component, similar to Tinder, with no dependencies",
   "keywords": [
